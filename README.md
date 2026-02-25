@@ -3,7 +3,7 @@
 [![CI](https://github.com/Afstkla/llmkit/actions/workflows/ci.yml/badge.svg)](https://github.com/Afstkla/llmkit/actions/workflows/ci.yml)
 [![Docs](https://github.com/Afstkla/llmkit/actions/workflows/docs.yml/badge.svg)](https://afstkla.github.io/llmkit/)
 
-Minimal, typed Python LLM wrapper. One `Chat` object, multiple providers, no boilerplate.
+Minimal, typed Python LLM wrapper. One `Agent` object, multiple providers, no boilerplate.
 
 Supports **OpenAI**, **Anthropic**, and **Gemini**.
 
@@ -22,11 +22,11 @@ Requires Python 3.14+.
 
 ```python
 import asyncio
-from llmkit import Chat, Anthropic
+from llmkit import Agent, Anthropic
 
 async def main():
-    chat = Chat(Anthropic.CLAUDE_SONNET, system="Be concise.")
-    reply = await chat.send("What is 2+2?")
+    agent = Agent(Anthropic.CLAUDE_SONNET, system="Be concise.")
+    reply = await agent.send("What is 2+2?")
     print(reply.text)      # "4"
     print(reply.usage)     # Usage(input_tokens=..., output_tokens=...)
 
@@ -38,9 +38,9 @@ asyncio.run(main())
 State is managed automatically:
 
 ```python
-chat = Chat("openai/gpt-4o", system="You are helpful.")
-await chat.send("My name is Job")
-reply = await chat.send("What is my name?")
+agent = Agent("openai/gpt-4o", system="You are helpful.")
+await agent.send("My name is Job")
+reply = await agent.send("What is my name?")
 # reply.text -> "Job"
 ```
 
@@ -56,7 +56,7 @@ class City(BaseModel):
     country: str
     population: int
 
-reply = await chat.send("Tell me about Amsterdam", response_model=City)
+reply = await agent.send("Tell me about Amsterdam", response_model=City)
 reply.parsed  # City(name="Amsterdam", country="Netherlands", population=...)
 ```
 
@@ -65,42 +65,67 @@ reply.parsed  # City(name="Amsterdam", country="Netherlands", population=...)
 Register tools with a decorator — schema is extracted from type hints and docstrings:
 
 ```python
-chat = Chat("openai/gpt-4o")
+agent = Agent("openai/gpt-4o")
 
-@chat.tool
+@agent.tool
 def multiply(a: int, b: int) -> int:
     """Multiply two numbers."""
     return a * b
 
-reply = await chat.send("What is 7 times 8?")
+reply = await agent.send("What is 7 times 8?")
 # Tool is called automatically, result fed back to the model
 ```
 
 Async tools and programmatic registration:
 
 ```python
-@chat.tool
+@agent.tool
 async def fetch(url: str) -> str:
     """Fetch a URL."""
     return await aiohttp_get(url)
 
 # Programmatic
-chat.tools.register(some_function)
-chat.tools.register(fn, name="custom", description="Override docstring")
-chat.tools.unregister("fetch")
+agent.tools.register(some_function)
+agent.tools.register(fn, name="custom", description="Override docstring")
+agent.tools.unregister("fetch")
+```
+
+## Hosted Tools
+
+Use provider-hosted tools like web search:
+
+```python
+from llmkit import Agent, Anthropic, WebSearch
+
+agent = Agent(Anthropic.CLAUDE_SONNET, hosted_tools=[WebSearch()])
+reply = await agent.send("What happened in the news today?")
+```
+
+Works with OpenAI, Anthropic, and Gemini.
+
+## Agent-as-Tool
+
+Turn an agent into a tool another agent can call:
+
+```python
+researcher = Agent("anthropic/claude-sonnet-4-20250514", system="You research topics thoroughly.")
+writer = Agent("openai/gpt-4o", system="You write clear summaries.")
+
+writer.tools.register(researcher.as_tool(name="research", description="Research a topic"))
+reply = await writer.send("Write a summary about quantum computing")
 ```
 
 ## Streaming
 
 ```python
-async for chunk in chat.stream("Write me a story"):
+async for chunk in agent.stream("Write me a story"):
     print(chunk.text, end="")
 ```
 
 ## Sync Convenience
 
 ```python
-reply = chat.send_sync("Quick question")
+reply = agent.send_sync("Quick question")
 ```
 
 ## Model Enums
@@ -108,16 +133,16 @@ reply = chat.send_sync("Quick question")
 Autocomplete-friendly model selection:
 
 ```python
-from llmkit import OpenAI, Anthropic, Gemini
+from llmkit import Agent, OpenAI, Anthropic, Gemini
 
-Chat(OpenAI.GPT_4O)
-Chat(OpenAI.GPT_4O_MINI)
-Chat(Anthropic.CLAUDE_OPUS)
-Chat(Anthropic.CLAUDE_SONNET)
-Chat(Gemini.GEMINI_2_5_PRO)
+Agent(OpenAI.GPT_4O)
+Agent(OpenAI.GPT_4O_MINI)
+Agent(Anthropic.CLAUDE_OPUS)
+Agent(Anthropic.CLAUDE_SONNET)
+Agent(Gemini.GEMINI_2_5_PRO)
 
 # Raw strings still work
-Chat("openai/gpt-4o")
+Agent("openai/gpt-4o")
 ```
 
 ## Auth
@@ -131,16 +156,16 @@ API keys are read from environment variables by default:
 Override per instance:
 
 ```python
-chat = Chat("openai/gpt-4o", api_key="sk-...")
+agent = Agent("openai/gpt-4o", api_key="sk-...")
 ```
 
 ## Custom Providers
 
 ```python
-from llmkit import register_provider
+from llmkit import Agent, register_provider
 
 register_provider("ollama", OllamaProvider)
-chat = Chat("ollama/llama3")
+agent = Agent("ollama/llama3")
 ```
 
 ## Contributing

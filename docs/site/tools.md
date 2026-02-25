@@ -5,16 +5,16 @@ Register functions as tools. The model calls them automatically.
 ## Decorator
 
 ```python
-from llmkit import Chat, OpenAI
+from llmkit import Agent, OpenAI
 
-chat = Chat(OpenAI.GPT_4O)
+agent = Agent(OpenAI.GPT_4O)
 
-@chat.tool
+@agent.tool
 def search(query: str) -> str:
     """Search the web for information."""
     return do_search(query)
 
-reply = await chat.send("What's the weather in Amsterdam?")
+reply = await agent.send("What's the weather in Amsterdam?")
 # search() is called automatically, result fed back to the model
 ```
 
@@ -23,7 +23,7 @@ The function name becomes the tool name. The docstring becomes the description. 
 ## Async tools
 
 ```python
-@chat.tool
+@agent.tool
 async def fetch(url: str) -> str:
     """Fetch contents of a URL."""
     return await aiohttp_get(url)
@@ -34,10 +34,36 @@ async def fetch(url: str) -> str:
 For tools you create at runtime:
 
 ```python
-chat.tools.register(some_function)
-chat.tools.register(fn, name="custom_name", description="Override the docstring")
-chat.tools.unregister("search")
-chat.tools.list()  # list[ToolDef]
+agent.tools.register(some_function)
+agent.tools.register(fn, name="custom_name", description="Override the docstring")
+agent.tools.unregister("search")
+agent.tools.list()  # list[ToolDef]
+```
+
+## Hosted tools
+
+Providers offer built-in tools like web search. Use them via `hosted_tools`:
+
+```python
+from llmkit import Agent, Anthropic, WebSearch
+
+agent = Agent(Anthropic.CLAUDE_SONNET, hosted_tools=[WebSearch()])
+reply = await agent.send("What happened in the news today?")
+```
+
+Works with OpenAI, Anthropic, and Gemini — llmkit translates to each provider's format.
+
+## Agent-as-tool
+
+Turn an agent into a tool another agent can call:
+
+```python
+researcher = Agent("anthropic/claude-sonnet-4-20250514", system="You research topics thoroughly.")
+writer = Agent("openai/gpt-4o", system="You write clear summaries.")
+
+writer.tools.register(researcher.as_tool(name="research", description="Research a topic"))
+reply = await writer.send("Write a summary about quantum computing")
+# writer calls researcher as a tool, gets back research, writes summary
 ```
 
 ## How it works
@@ -56,7 +82,7 @@ This loops up to `max_tool_iterations` times (default 10). If a tool raises an e
 Parameters are extracted from type hints using Pydantic's `TypeAdapter`:
 
 ```python
-@chat.tool
+@agent.tool
 def search(query: str, max_results: int = 10, filter: str | None = None) -> str:
     """Search for things."""
     ...

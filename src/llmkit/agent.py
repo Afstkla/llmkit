@@ -1,16 +1,17 @@
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from typing import Any, cast
 
 from pydantic import BaseModel
 
 from llmkit.exceptions import ToolError
+from llmkit.hosted_tools import HostedTool
 from llmkit.tools import ToolRegistry
 from llmkit.types import Message, Reply, ToolCall
 
 
-class Chat:
+class Agent:
     def __init__(
         self,
         model: str,
@@ -22,6 +23,7 @@ class Chat:
         aws_region: str | None = None,
         project_id: str | None = None,
         region: str | None = None,
+        hosted_tools: list[HostedTool] | None = None,
         max_tool_iterations: int = 10,
         structured_retries: int = 1,
     ) -> None:
@@ -47,6 +49,7 @@ class Chat:
         self._system = system
         self._messages: list[Message] = []
         self._tools = ToolRegistry()
+        self._hosted_tools = hosted_tools or []
         self._max_tool_iterations = max_tool_iterations
         self._structured_retries = structured_retries
 
@@ -59,8 +62,19 @@ class Chat:
         return self._tools
 
     def tool(self, fn: Any) -> Any:
-        """Decorator to register a tool on this chat."""
+        """Decorator to register a tool on this agent."""
         return self._tools.register(fn)
+
+    def as_tool(self, *, name: str, description: str) -> Callable[..., Any]:
+        """Turn this agent into a tool another agent can call."""
+        async def _agent_tool(message: str) -> str:
+            reply = await self.send(message)
+            return reply.text or ""
+
+        _agent_tool.__name__ = name
+        _agent_tool.__doc__ = description
+        _agent_tool.__annotations__ = {"message": str, "return": str}
+        return _agent_tool
 
     async def send(
         self,
@@ -76,6 +90,7 @@ class Chat:
                 self._messages,
                 system=self._system,
                 tools=tools_list if tools_list else None,
+                hosted_tools=self._hosted_tools if self._hosted_tools else None,
                 response_model=response_model,
             )
 
@@ -143,5 +158,10 @@ class Chat:
             self._messages,
             system=self._system,
             tools=tools_list if tools_list else None,
+            hosted_tools=self._hosted_tools if self._hosted_tools else None,
         ):
             yield chunk
+
+
+# Backwards compatibility
+Chat = Agent

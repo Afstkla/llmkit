@@ -2,21 +2,31 @@
 from collections.abc import AsyncIterator
 from typing import Any, Protocol
 
-from llmkit.types import Message
+from llmkit.hosted_tools import HostedTool
+from llmkit.types import Message, Reply, ToolDef
 
 
 class Provider(Protocol):
     async def send(
         self,
         messages: list[Message],
+        *,
+        system: str | None = None,
+        tools: list[ToolDef] | None = None,
+        hosted_tools: list[HostedTool] | None = None,
+        response_model: type | None = None,
         **kwargs: Any,
-    ) -> Any: ...
+    ) -> Reply: ...
 
     async def stream(
         self,
         messages: list[Message],
+        *,
+        system: str | None = None,
+        tools: list[ToolDef] | None = None,
+        hosted_tools: list[HostedTool] | None = None,
         **kwargs: Any,
-    ) -> AsyncIterator[Any]: ...
+    ) -> AsyncIterator[Reply]: ...
 
 
 _registry: dict[str, type] = {}

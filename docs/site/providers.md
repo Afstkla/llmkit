@@ -16,9 +16,9 @@
 ### Azure OpenAI
 
 ```python
-from llmkit import Chat
+from llmkit import Agent
 
-chat = Chat(
+agent = Agent(
     "azure/gpt-4o",
     api_key="...",
     base_url="https://my-resource.openai.azure.com",
@@ -31,9 +31,9 @@ Or set `AZURE_OPENAI_API_KEY` and `AZURE_OPENAI_ENDPOINT` env vars.
 ### AWS Bedrock
 
 ```python
-from llmkit import Chat, Bedrock
+from llmkit import Agent, Bedrock
 
-chat = Chat(Bedrock.CLAUDE_SONNET, aws_region="us-west-2")
+agent = Agent(Bedrock.CLAUDE_SONNET, aws_region="us-west-2")
 ```
 
 Uses your default AWS credentials (env vars, `~/.aws/credentials`, or IAM role).
@@ -41,9 +41,9 @@ Uses your default AWS credentials (env vars, `~/.aws/credentials`, or IAM role).
 ### GCP Vertex AI
 
 ```python
-from llmkit import Chat, Vertex
+from llmkit import Agent, Vertex
 
-chat = Chat(Vertex.CLAUDE_SONNET, project_id="my-project", region="us-east5")
+agent = Agent(Vertex.CLAUDE_SONNET, project_id="my-project", region="us-east5")
 ```
 
 Uses your default GCP credentials (`gcloud auth application-default login`).
@@ -53,7 +53,7 @@ Uses your default GCP credentials (`gcloud auth application-default login`).
 Implement the `Provider` protocol and register:
 
 ```python
-from llmkit import Chat, register_provider
+from llmkit import Agent, register_provider
 
 class OllamaProvider:
     def __init__(self, *, model, api_key=None, **kwargs):
@@ -66,5 +66,5 @@ class OllamaProvider:
         ...
 
 register_provider("ollama", OllamaProvider)
-chat = Chat("ollama/llama3")
+agent = Agent("ollama/llama3")
 ```

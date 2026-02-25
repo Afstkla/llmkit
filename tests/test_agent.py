@@ -2,7 +2,7 @@
 from collections.abc import AsyncIterator
 from typing import Any
 
-from llmkit.chat import Chat
+from llmkit.agent import Agent
 from llmkit.tools import ToolRegistry
 from llmkit.types import Message, Reply, ToolCall, Usage
 
@@ -43,14 +43,15 @@ def _tool_call_reply(name: str, args: dict[str, Any], call_id: str = "call_1") -
     )
 
 
-def _make_chat(provider: FakeProvider, system: str | None = None) -> Chat:
-    """Create a Chat instance with a fake provider, bypassing __init__."""
-    chat = object.__new__(Chat)
+def _make_chat(provider: FakeProvider, system: str | None = None) -> Agent:
+    """Create a Agent instance with a fake provider, bypassing __init__."""
+    chat = object.__new__(Agent)
     chat._provider = provider
     chat._system = system
     chat._messages = []
     chat._tools = ToolRegistry()
     chat._model_name = "fake/test"
+    chat._hosted_tools = []
     chat._max_tool_iterations = 10
     chat._structured_retries = 1
     return chat
@@ -98,3 +99,25 @@ def test_send_sync():
 
     reply = chat.send_sync("Hello")
     assert reply.text == "Sync reply"
+
+
+async def test_as_tool():
+    provider = FakeProvider([_simple_reply("Tool response")])
+    agent = _make_chat(provider)
+
+    tool_fn = agent.as_tool(name="my_agent", description="A helpful agent")
+    assert tool_fn.__name__ == "my_agent"
+    assert tool_fn.__doc__ == "A helpful agent"
+    assert tool_fn.__annotations__ == {"message": str, "return": str}
+
+    result = await tool_fn(message="Hello")
+    assert result == "Tool response"
+
+
+async def test_as_tool_empty_response():
+    provider = FakeProvider([_simple_reply(None)])
+    agent = _make_chat(provider)
+
+    tool_fn = agent.as_tool(name="agent", description="An agent")
+    result = await tool_fn(message="Hello")
+    assert result == ""

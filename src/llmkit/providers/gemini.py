@@ -3,6 +3,7 @@ import os
 from collections.abc import AsyncIterator
 from typing import Any
 
+from llmkit.hosted_tools import HostedTool, hosted_tools_for_gemini
 from llmkit.types import Message, Reply, ToolCall, ToolDef, Usage
 
 try:
@@ -28,6 +29,7 @@ class GeminiProvider:
         *,
         system: str | None = None,
         tools: list[ToolDef] | None = None,
+        hosted_tools: list[HostedTool] | None = None,
         response_model: type | None = None,
         **kwargs: Any,
     ) -> Reply:
@@ -37,8 +39,13 @@ class GeminiProvider:
         if system:
             config["system_instruction"] = system
 
+        gemini_tools: list[dict[str, Any]] = []
         if tools:
-            config["tools"] = [_tools_to_gemini(tools)]
+            gemini_tools.append(_tools_to_gemini(tools))
+        if hosted_tools:
+            gemini_tools.extend(hosted_tools_for_gemini(hosted_tools))
+        if gemini_tools:
+            config["tools"] = gemini_tools
 
         if response_model is not None:
             from pydantic import BaseModel
@@ -60,6 +67,7 @@ class GeminiProvider:
         *,
         system: str | None = None,
         tools: list[ToolDef] | None = None,
+        hosted_tools: list[HostedTool] | None = None,
         **kwargs: Any,
     ) -> AsyncIterator[Reply]:
         contents = _build_contents(messages)
@@ -68,8 +76,13 @@ class GeminiProvider:
         if system:
             config["system_instruction"] = system
 
+        gemini_tools: list[dict[str, Any]] = []
         if tools:
-            config["tools"] = [_tools_to_gemini(tools)]
+            gemini_tools.append(_tools_to_gemini(tools))
+        if hosted_tools:
+            gemini_tools.extend(hosted_tools_for_gemini(hosted_tools))
+        if gemini_tools:
+            config["tools"] = gemini_tools
 
         stream = self._client.aio.models.generate_content_stream(
             model=self._model,

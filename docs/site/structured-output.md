@@ -6,15 +6,15 @@ Pass a Pydantic model to `response_model` and get a validated instance back.
 
 ```python
 from pydantic import BaseModel
-from llmkit import Chat, Anthropic
+from llmkit import Agent, Anthropic
 
 class City(BaseModel):
     name: str
     country: str
     population: int
 
-chat = Chat(Anthropic.CLAUDE_SONNET)
-reply = await chat.send("Tell me about Amsterdam", response_model=City)
+agent = Agent(Anthropic.CLAUDE_SONNET)
+reply = await agent.send("Tell me about Amsterdam", response_model=City)
 
 reply.parsed  # City(name="Amsterdam", country="Netherlands", population=872680)
 ```
@@ -41,7 +41,7 @@ class Person(BaseModel):
     address: Address
     hobbies: list[str]
 
-reply = await chat.send("Make up a person", response_model=Person)
+reply = await agent.send("Make up a person", response_model=Person)
 ```
 
 ## Access

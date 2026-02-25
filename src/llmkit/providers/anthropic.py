@@ -3,6 +3,7 @@ import os
 from collections.abc import AsyncIterator
 from typing import Any
 
+from llmkit.hosted_tools import HostedTool, hosted_tools_for_anthropic
 from llmkit.types import Message, Reply, ToolCall, ToolDef, Usage
 
 
@@ -19,6 +20,7 @@ class AnthropicProvider:
         *,
         system: str | None = None,
         tools: list[ToolDef] | None = None,
+        hosted_tools: list[HostedTool] | None = None,
         response_model: type | None = None,
         **kwargs: Any,
     ) -> Reply:
@@ -32,20 +34,24 @@ class AnthropicProvider:
         if system:
             req_kwargs["system"] = system
 
+        ant_tools: list[dict[str, Any]] = []
         if tools:
-            req_kwargs["tools"] = [_tool_to_anthropic(t) for t in tools]
+            ant_tools.extend(_tool_to_anthropic(t) for t in tools)
+        if hosted_tools:
+            ant_tools.extend(hosted_tools_for_anthropic(hosted_tools))
+        if ant_tools:
+            req_kwargs["tools"] = ant_tools
 
         if response_model is not None:
             from pydantic import BaseModel
 
             if issubclass(response_model, BaseModel):
-                req_kwargs["tools"] = req_kwargs.get("tools", []) + [
-                    {
-                        "name": f"structured_{response_model.__name__}",
-                        "description": f"Return structured {response_model.__name__} output",
-                        "input_schema": response_model.model_json_schema(),
-                    }
-                ]
+                ant_tools.append({
+                    "name": f"structured_{response_model.__name__}",
+                    "description": f"Return structured {response_model.__name__} output",
+                    "input_schema": response_model.model_json_schema(),
+                })
+                req_kwargs["tools"] = ant_tools
                 tool_name = f"structured_{response_model.__name__}"
                 req_kwargs["tool_choice"] = {"type": "tool", "name": tool_name}
 
@@ -58,6 +64,7 @@ class AnthropicProvider:
         *,
         system: str | None = None,
         tools: list[ToolDef] | None = None,
+        hosted_tools: list[HostedTool] | None = None,
         **kwargs: Any,
     ) -> AsyncIterator[Reply]:
         ant_messages = _build_messages(messages)
@@ -70,8 +77,13 @@ class AnthropicProvider:
         if system:
             req_kwargs["system"] = system
 
+        ant_tools: list[dict[str, Any]] = []
         if tools:
-            req_kwargs["tools"] = [_tool_to_anthropic(t) for t in tools]
+            ant_tools.extend(_tool_to_anthropic(t) for t in tools)
+        if hosted_tools:
+            ant_tools.extend(hosted_tools_for_anthropic(hosted_tools))
+        if ant_tools:
+            req_kwargs["tools"] = ant_tools
 
         async with self._client.messages.stream(**req_kwargs) as stream:
             async for text in stream.text_stream:

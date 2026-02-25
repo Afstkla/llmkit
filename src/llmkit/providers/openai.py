@@ -4,6 +4,7 @@ import os
 from collections.abc import AsyncIterator
 from typing import Any
 
+from llmkit.hosted_tools import HostedTool, hosted_tools_for_openai
 from llmkit.types import Message, Reply, ToolCall, ToolDef, Usage
 
 
@@ -20,14 +21,20 @@ class OpenAIProvider:
         *,
         system: str | None = None,
         tools: list[ToolDef] | None = None,
+        hosted_tools: list[HostedTool] | None = None,
         response_model: type | None = None,
         **kwargs: Any,
     ) -> Reply:
         oai_messages = _build_messages(messages, system)
         req_kwargs: dict[str, Any] = {"model": self._model, "messages": oai_messages}
 
+        oai_tools: list[dict[str, Any]] = []
         if tools:
-            req_kwargs["tools"] = [_tool_to_oai(t) for t in tools]
+            oai_tools.extend(_tool_to_oai(t) for t in tools)
+        if hosted_tools:
+            oai_tools.extend(hosted_tools_for_openai(hosted_tools))
+        if oai_tools:
+            req_kwargs["tools"] = oai_tools
 
         if response_model is not None:
             req_kwargs["response_format"] = _response_format(response_model)
@@ -41,6 +48,7 @@ class OpenAIProvider:
         *,
         system: str | None = None,
         tools: list[ToolDef] | None = None,
+        hosted_tools: list[HostedTool] | None = None,
         **kwargs: Any,
     ) -> AsyncIterator[Reply]:
         oai_messages = _build_messages(messages, system)
@@ -48,8 +56,13 @@ class OpenAIProvider:
             "model": self._model, "messages": oai_messages, "stream": True,
         }
 
+        oai_tools: list[dict[str, Any]] = []
         if tools:
-            req_kwargs["tools"] = [_tool_to_oai(t) for t in tools]
+            oai_tools.extend(_tool_to_oai(t) for t in tools)
+        if hosted_tools:
+            oai_tools.extend(hosted_tools_for_openai(hosted_tools))
+        if oai_tools:
+            req_kwargs["tools"] = oai_tools
 
         stream = await self._client.chat.completions.create(**req_kwargs)
         async for chunk in stream:

@@ -5,11 +5,11 @@ Stream responses as they're generated.
 ## Usage
 
 ```python
-from llmkit import Chat, Anthropic
+from llmkit import Agent, Anthropic
 
-chat = Chat(Anthropic.CLAUDE_SONNET)
+agent = Agent(Anthropic.CLAUDE_SONNET)
 
-async for chunk in chat.stream("Write me a short story"):
+async for chunk in agent.stream("Write me a short story"):
     print(chunk.text, end="")
 ```
 

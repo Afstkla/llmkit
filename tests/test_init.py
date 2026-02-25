@@ -1,11 +1,13 @@
 def test_public_api():
-    from llmkit import Anthropic, Chat, Gemini, OpenAI, register_provider
+    from llmkit import Agent, Anthropic, Chat, Gemini, OpenAI, WebSearch, register_provider
 
-    assert Chat is not None
+    assert Agent is not None
+    assert Chat is Agent  # backwards compat alias
     assert register_provider is not None
     assert OpenAI is not None
     assert Anthropic is not None
     assert Gemini is not None
+    assert WebSearch is not None
 
 
 def test_types_importable():

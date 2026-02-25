@@ -12,11 +12,11 @@ Or pick your provider: `openai`, `anthropic`, `gemini`, `azure`, `bedrock`, `ver
 
 ```python
 import asyncio
-from llmkit import Chat, OpenAI
+from llmkit import Agent, OpenAI
 
 async def main():
-    chat = Chat(OpenAI.GPT_4O_MINI, system="Be concise.")
-    reply = await chat.send("What is the capital of France?")
+    agent = Agent(OpenAI.GPT_4O_MINI, system="Be concise.")
+    reply = await agent.send("What is the capital of France?")
     print(reply.text)
     print(reply.usage)  # Usage(input_tokens=..., output_tokens=...)
 
@@ -28,20 +28,20 @@ asyncio.run(main())
 State is managed automatically. Just keep calling `send`:
 
 ```python
-chat = Chat("anthropic/claude-sonnet-4-20250514")
-await chat.send("My name is Job")
-reply = await chat.send("What is my name?")
+agent = Agent("anthropic/claude-sonnet-4-20250514")
+await agent.send("My name is Job")
+reply = await agent.send("What is my name?")
 # reply.text -> "Job"
 ```
 
-Access the full history via `chat.messages`.
+Access the full history via `agent.messages`.
 
 ## Sync convenience
 
 If you don't want async:
 
 ```python
-reply = chat.send_sync("Quick question")
+reply = agent.send_sync("Quick question")
 ```
 
 ## Model selection
@@ -49,14 +49,14 @@ reply = chat.send_sync("Quick question")
 Use enums for autocomplete, or raw strings:
 
 ```python
-from llmkit import OpenAI, Anthropic, Gemini
+from llmkit import Agent, OpenAI, Anthropic, Gemini
 
-Chat(OpenAI.GPT_4O)
-Chat(Anthropic.CLAUDE_SONNET)
-Chat(Gemini.GEMINI_2_5_PRO)
+Agent(OpenAI.GPT_4O)
+Agent(Anthropic.CLAUDE_SONNET)
+Agent(Gemini.GEMINI_2_5_PRO)
 
 # Raw strings work too
-Chat("openai/gpt-4o")
+Agent("openai/gpt-4o")
 ```
 
 ## Auth
@@ -73,5 +73,5 @@ API keys are read from environment variables by default:
 Override per instance:
 
 ```python
-chat = Chat("openai/gpt-4o", api_key="sk-...")
+agent = Agent("openai/gpt-4o", api_key="sk-...")
 ```
