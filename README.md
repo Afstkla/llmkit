@@ -140,6 +140,24 @@ register_provider("ollama", OllamaProvider)
 chat = Chat("ollama/llama3")
 ```
 
+## Contributing
+
+```bash
+git clone git@github.com:Afstkla/llmkit.git
+cd llmkit
+uv sync --all-extras --all-groups
+```
+
+Run checks:
+
+```bash
+uv run ruff check src/ tests/    # lint
+uv run ty check src/              # type check
+uv run pytest -v                  # tests
+```
+
+All three must pass before submitting a PR.
+
 ## License
 
 MIT
