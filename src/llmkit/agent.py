@@ -2,8 +2,8 @@
 import asyncio
 import inspect
 from collections import defaultdict
-from collections.abc import AsyncIterator, Callable
-from typing import Any, cast
+from collections.abc import AsyncIterator, Awaitable, Callable
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel
 
@@ -11,6 +11,19 @@ from llmkit.exceptions import ToolError
 from llmkit.hosted_tools import HostedTool
 from llmkit.tools import ToolRegistry
 from llmkit.types import Message, Reply, ToolCall
+
+type Event = Literal["turn_start", "turn_end", "tool_call_start", "tool_call_end"]
+
+type TurnStartHook = Callable[[list[Message]], None] | Callable[[list[Message]], Awaitable[None]]
+type TurnEndHook = Callable[[Reply], None] | Callable[[Reply], Awaitable[None]]
+type ToolCallStartHook = (
+    Callable[[str, dict[str, Any]], None] | Callable[[str, dict[str, Any]], Awaitable[None]]
+)
+type ToolCallEndHook = (
+    Callable[[str, dict[str, Any], str], None]
+    | Callable[[str, dict[str, Any], str], Awaitable[None]]
+)
+type Hook = TurnStartHook | TurnEndHook | ToolCallStartHook | ToolCallEndHook
 
 
 class Agent:
@@ -52,7 +65,7 @@ class Agent:
         self._messages: list[Message] = []
         self._tools = ToolRegistry()
         self._hosted_tools = hosted_tools or []
-        self._hooks: dict[str, list[Callable[..., Any]]] = defaultdict(list)
+        self._hooks: dict[Event, list[Hook]] = defaultdict(list)
         self._max_tool_iterations = max_tool_iterations
         self._structured_retries = structured_retries
 
@@ -68,19 +81,19 @@ class Agent:
         """Decorator to register a tool on this agent."""
         return self._tools.register(fn)
 
-    def on(self, event: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def on[F: Hook](self, event: Event) -> Callable[[F], F]:
         """Decorator to register a lifecycle hook.
 
         Events: turn_start, turn_end, tool_call_start, tool_call_end
         """
-        def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
+        def decorator(fn: F) -> F:
             self._hooks[event].append(fn)
             return fn
         return decorator
 
-    async def _emit(self, event: str, **kwargs: Any) -> None:
+    async def _emit(self, event: Event, *args: Any) -> None:
         for fn in self._hooks.get(event, []):
-            result = fn(**kwargs)
+            result = fn(*args)
             if inspect.isawaitable(result):
                 await result
 
@@ -104,7 +117,7 @@ class Agent:
         self._messages.append(Message(role="user", content=content))
 
         for _ in range(self._max_tool_iterations):
-            await self._emit("turn_start", messages=self._messages)
+            await self._emit("turn_start", self._messages)
 
             tools_list = self._tools.list()
             reply: Reply = await self._provider.send(
@@ -115,7 +128,7 @@ class Agent:
                 response_model=response_model,
             )
 
-            await self._emit("turn_end", reply=reply)
+            await self._emit("turn_end", reply)
 
             if not reply.tool_calls:
                 self._messages.append(
@@ -128,7 +141,7 @@ class Agent:
                 Message(role="assistant", content=None, tool_calls=reply.tool_calls)
             )
             for tc in reply.tool_calls:
-                await self._emit("tool_call_start", name=tc.name, args=tc.args)
+                await self._emit("tool_call_start", tc.name, tc.args)
 
                 try:
                     result = await self._tools.acall(tc.name, tc.args)
@@ -136,7 +149,7 @@ class Agent:
                 except Exception as e:
                     result_str = f"Error: {e}"
 
-                await self._emit("tool_call_end", name=tc.name, args=tc.args, result=result_str)
+                await self._emit("tool_call_end", tc.name, tc.args, result_str)
 
                 tool_result = ToolCall(
                     id=tc.id, name=tc.name, args=tc.args, result=result_str,

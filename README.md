@@ -120,12 +120,14 @@ reply = await writer.send("Write a summary about quantum computing")
 Tap into the agent lifecycle with `@agent.on()`:
 
 ```python
+from llmkit.types import Message, Reply
+
 @agent.on("turn_start")
-def on_turn(messages):
+def on_turn(messages: list[Message]) -> None:
     print(f"Sending {len(messages)} messages...")
 
 @agent.on("tool_call_start")
-def on_tool(name, args):
+def on_tool(name: str, args: dict[str, Any]) -> None:
     print(f"Calling {name}({args})")
 ```
 
