@@ -1,4 +1,5 @@
 
+from collections import defaultdict
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -52,6 +53,7 @@ def _make_chat(provider: FakeProvider, system: str | None = None) -> Agent:
     chat._tools = ToolRegistry()
     chat._model_name = "fake/test"
     chat._hosted_tools = []
+    chat._hooks = defaultdict(list)
     chat._max_tool_iterations = 10
     chat._structured_retries = 1
     return chat
@@ -121,3 +123,75 @@ async def test_as_tool_empty_response():
     tool_fn = agent.as_tool(name="agent", description="An agent")
     result = await tool_fn(message="Hello")
     assert result == ""
+
+
+async def test_hook_turn_start_end():
+    provider = FakeProvider([_simple_reply("Hi")])
+    agent = _make_chat(provider)
+    events: list[str] = []
+
+    @agent.on("turn_start")
+    def on_start(messages: list[Message]) -> None:
+        events.append(f"start:{len(messages)}")
+
+    @agent.on("turn_end")
+    def on_end(reply: Reply) -> None:
+        events.append(f"end:{reply.text}")
+
+    await agent.send("Hello")
+    assert events == ["start:1", "end:Hi"]
+
+
+async def test_hook_tool_call_start_end():
+    provider = FakeProvider([
+        _tool_call_reply("add", {"a": 1, "b": 2}),
+        _simple_reply("3"),
+    ])
+    agent = _make_chat(provider)
+    events: list[str] = []
+
+    @agent.tool
+    def add(a: int, b: int) -> int:
+        """Add two numbers."""
+        return a + b
+
+    @agent.on("tool_call_start")
+    def on_tool_start(name: str, args: dict[str, Any]) -> None:
+        events.append(f"call:{name}")
+
+    @agent.on("tool_call_end")
+    def on_tool_end(name: str, args: dict[str, Any], result: str) -> None:
+        events.append(f"result:{name}={result}")
+
+    await agent.send("What is 1+2?")
+    assert events == ["call:add", "result:add=3"]
+
+
+async def test_hook_async():
+    provider = FakeProvider([_simple_reply("Hi")])
+    agent = _make_chat(provider)
+    events: list[str] = []
+
+    @agent.on("turn_end")
+    async def on_end(reply: Reply) -> None:
+        events.append(f"async:{reply.text}")
+
+    await agent.send("Hello")
+    assert events == ["async:Hi"]
+
+
+async def test_hook_multiple_handlers():
+    provider = FakeProvider([_simple_reply("Hi")])
+    agent = _make_chat(provider)
+    events: list[str] = []
+
+    @agent.on("turn_start")
+    def first(messages: list[Message]) -> None:
+        events.append("first")
+
+    @agent.on("turn_start")
+    def second(messages: list[Message]) -> None:
+        events.append("second")
+
+    await agent.send("Hello")
+    assert events == ["first", "second"]

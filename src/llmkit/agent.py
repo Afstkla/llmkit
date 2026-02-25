@@ -1,5 +1,7 @@
 
 import asyncio
+import inspect
+from collections import defaultdict
 from collections.abc import AsyncIterator, Callable
 from typing import Any, cast
 
@@ -50,6 +52,7 @@ class Agent:
         self._messages: list[Message] = []
         self._tools = ToolRegistry()
         self._hosted_tools = hosted_tools or []
+        self._hooks: dict[str, list[Callable[..., Any]]] = defaultdict(list)
         self._max_tool_iterations = max_tool_iterations
         self._structured_retries = structured_retries
 
@@ -64,6 +67,22 @@ class Agent:
     def tool(self, fn: Any) -> Any:
         """Decorator to register a tool on this agent."""
         return self._tools.register(fn)
+
+    def on(self, event: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        """Decorator to register a lifecycle hook.
+
+        Events: turn_start, turn_end, tool_call_start, tool_call_end
+        """
+        def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
+            self._hooks[event].append(fn)
+            return fn
+        return decorator
+
+    async def _emit(self, event: str, **kwargs: Any) -> None:
+        for fn in self._hooks.get(event, []):
+            result = fn(**kwargs)
+            if inspect.isawaitable(result):
+                await result
 
     def as_tool(self, *, name: str, description: str) -> Callable[..., Any]:
         """Turn this agent into a tool another agent can call."""
@@ -85,6 +104,8 @@ class Agent:
         self._messages.append(Message(role="user", content=content))
 
         for _ in range(self._max_tool_iterations):
+            await self._emit("turn_start", messages=self._messages)
+
             tools_list = self._tools.list()
             reply: Reply = await self._provider.send(
                 self._messages,
@@ -93,6 +114,8 @@ class Agent:
                 hosted_tools=self._hosted_tools if self._hosted_tools else None,
                 response_model=response_model,
             )
+
+            await self._emit("turn_end", reply=reply)
 
             if not reply.tool_calls:
                 self._messages.append(
@@ -105,11 +128,15 @@ class Agent:
                 Message(role="assistant", content=None, tool_calls=reply.tool_calls)
             )
             for tc in reply.tool_calls:
+                await self._emit("tool_call_start", name=tc.name, args=tc.args)
+
                 try:
                     result = await self._tools.acall(tc.name, tc.args)
                     result_str = str(result)
                 except Exception as e:
                     result_str = f"Error: {e}"
+
+                await self._emit("tool_call_end", name=tc.name, args=tc.args, result=result_str)
 
                 tool_result = ToolCall(
                     id=tc.id, name=tc.name, args=tc.args, result=result_str,
