@@ -4,7 +4,7 @@ import asyncio
 
 from pydantic import BaseModel
 
-from llmkit import Anthropic, Chat, OpenAI
+from llmkit import Agent, Anthropic, OpenAI
 
 
 class City(BaseModel):
@@ -13,34 +13,52 @@ class City(BaseModel):
     population: int
 
 
-async def main():
+async def main() -> None:
     # Test basic send
-    chat = Chat(OpenAI.GPT_4O_MINI, system="Be concise.")
-    reply = await chat.send("What is 2+2?")
+    agent = Agent(OpenAI.GPT_4O_MINI, system="Be concise.")
+    reply = await agent.send("What is 2+2?")
     print(f"OpenAI: {reply.text}")
     print(f"Usage: {reply.usage}")
 
     # Test structured output
-    chat2 = Chat(Anthropic.CLAUDE_SONNET)
-    reply2 = await chat2.send("Tell me about Amsterdam", response_model=City)
+    agent2 = Agent(Anthropic.CLAUDE_SONNET)
+    reply2 = await agent2.send("Tell me about Amsterdam", response_model=City)
     print(f"Anthropic structured: {reply2.parsed}")
 
-    # Test tools
-    chat3 = Chat(OpenAI.GPT_4O_MINI)
+    # Test single tool call
+    agent3 = Agent(OpenAI.GPT_4O_MINI)
 
-    @chat3.tool
+    @agent3.tool
     def multiply(a: int, b: int) -> int:
         """Multiply two numbers."""
         return a * b
 
-    reply3 = await chat3.send("What is 7 times 8?")
+    reply3 = await agent3.send("What is 7 times 8?")
     print(f"Tool result: {reply3.text}")
 
+    # Test parallel tool calls
+    agent4 = Agent(OpenAI.GPT_4O_MINI)
+
+    @agent4.tool
+    def add(a: int, b: int) -> int:
+        """Add two numbers together."""
+        return a + b
+
+    @agent4.tool
+    def subtract(a: int, b: int) -> int:
+        """Subtract b from a."""
+        return a - b
+
+    reply4 = await agent4.send(
+        "Calculate both of these: 15 + 27, and 100 - 37. Use the tools for both."
+    )
+    print(f"Parallel tools: {reply4.text}")
+
     # Test multi-turn
-    chat4 = Chat(Anthropic.CLAUDE_SONNET, system="Be concise.")
-    await chat4.send("My name is Job")
-    reply4 = await chat4.send("What is my name?")
-    print(f"Multi-turn: {reply4.text}")
+    agent5 = Agent(Anthropic.CLAUDE_SONNET, system="Be concise.")
+    await agent5.send("My name is Job")
+    reply5 = await agent5.send("What is my name?")
+    print(f"Multi-turn: {reply5.text}")
 
 
 asyncio.run(main())

@@ -125,6 +125,42 @@ async def test_as_tool_empty_response():
     assert result == ""
 
 
+async def test_parallel_tool_calls():
+    provider = FakeProvider([
+        Reply(
+            text=None,
+            parsed=None,
+            tool_calls=[
+                ToolCall(id="call_1", name="add", args={"a": 1, "b": 2}),
+                ToolCall(id="call_2", name="multiply", args={"a": 3, "b": 4}),
+            ],
+            usage=Usage(input_tokens=10, output_tokens=5),
+            raw={},
+        ),
+        _simple_reply("1+2=3 and 3*4=12"),
+    ])
+    agent = _make_chat(provider)
+
+    @agent.tool
+    def add(a: int, b: int) -> int:
+        """Add two numbers."""
+        return a + b
+
+    @agent.tool
+    def multiply(a: int, b: int) -> int:
+        """Multiply two numbers."""
+        return a * b
+
+    reply = await agent.send("What is 1+2 and 3*4?")
+    assert reply.text == "1+2=3 and 3*4=12"
+    # Should have: user, assistant (tool calls), tool result 1, tool result 2, assistant (final)
+    assert len(agent.messages) == 5
+    assert agent.messages[2].role == "tool"
+    assert agent.messages[2].content == "3"
+    assert agent.messages[3].role == "tool"
+    assert agent.messages[3].content == "12"
+
+
 async def test_hook_turn_start_end():
     provider = FakeProvider([_simple_reply("Hi")])
     agent = _make_chat(provider)
