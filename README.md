@@ -115,6 +115,22 @@ writer.tools.register(researcher.as_tool(name="research", description="Research 
 reply = await writer.send("Write a summary about quantum computing")
 ```
 
+## Hooks
+
+Tap into the agent lifecycle with `@agent.on()`:
+
+```python
+@agent.on("turn_start")
+def on_turn(messages):
+    print(f"Sending {len(messages)} messages...")
+
+@agent.on("tool_call_start")
+def on_tool(name, args):
+    print(f"Calling {name}({args})")
+```
+
+Events: `turn_start`, `turn_end`, `tool_call_start`, `tool_call_end`. Both sync and async handlers work.
+
 ## Streaming
 
 ```python

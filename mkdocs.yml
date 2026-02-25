@@ -35,5 +35,6 @@ nav:
   - Getting Started: getting-started.md
   - Structured Output: structured-output.md
   - Tools: tools.md
+  - Hooks: hooks.md
   - Streaming: streaming.md
   - Providers: providers.md
