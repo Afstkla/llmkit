@@ -18,6 +18,11 @@ class Chat:
         *,
         system: str | None = None,
         api_key: str | None = None,
+        base_url: str | None = None,
+        api_version: str | None = None,
+        aws_region: str | None = None,
+        project_id: str | None = None,
+        region: str | None = None,
         max_tool_iterations: int = 10,
         structured_retries: int = 1,
     ) -> None:
@@ -25,7 +30,20 @@ class Chat:
 
         provider_name, model_name = parse_model(model)
         provider_cls = get_provider_class(provider_name)
-        self._provider = provider_cls(model=model_name, api_key=api_key)
+
+        # Build provider kwargs from non-None values
+        provider_kwargs: dict[str, Any] = {"model": model_name, "api_key": api_key}
+        for key, val in [
+            ("base_url", base_url),
+            ("api_version", api_version),
+            ("aws_region", aws_region),
+            ("project_id", project_id),
+            ("region", region),
+        ]:
+            if val is not None:
+                provider_kwargs[key] = val
+
+        self._provider = provider_cls(**provider_kwargs)
         self._model_name = model_name
         self._system = system
         self._messages: list[Message] = []

@@ -28,3 +28,19 @@ class Gemini(StrEnum):
     GEMINI_2_5_PRO = "gemini/gemini-2.5-pro"
     GEMINI_2_5_FLASH = "gemini/gemini-2.5-flash"
     GEMINI_2_0_FLASH = "gemini/gemini-2.0-flash"
+
+
+class Bedrock(StrEnum):
+    """AWS Bedrock model identifiers."""
+
+    CLAUDE_OPUS = "bedrock/anthropic.claude-opus-4-20250514-v1:0"
+    CLAUDE_SONNET = "bedrock/anthropic.claude-sonnet-4-20250514-v1:0"
+    CLAUDE_HAIKU = "bedrock/anthropic.claude-haiku-3-5-20241022-v1:0"
+
+
+class Vertex(StrEnum):
+    """GCP Vertex AI (Anthropic) model identifiers."""
+
+    CLAUDE_OPUS = "vertex/claude-opus-4@20250514"
+    CLAUDE_SONNET = "vertex/claude-sonnet-4@20250514"
+    CLAUDE_HAIKU = "vertex/claude-haiku-3-5@20241022"

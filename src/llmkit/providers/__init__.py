@@ -59,6 +59,21 @@ def _register_builtins() -> None:
         register_provider("gemini", GeminiProvider)
     except ImportError:
         pass
+    try:
+        from llmkit.providers.azure import AzureOpenAIProvider
+        register_provider("azure", AzureOpenAIProvider)
+    except ImportError:
+        pass
+    try:
+        from llmkit.providers.bedrock import BedrockProvider
+        register_provider("bedrock", BedrockProvider)
+    except ImportError:
+        pass
+    try:
+        from llmkit.providers.vertex import VertexProvider
+        register_provider("vertex", VertexProvider)
+    except ImportError:
+        pass
 
 
 _register_builtins()
