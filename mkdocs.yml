@@ -37,5 +37,5 @@ nav:
   - Tools: tools.md
   - Hooks: hooks.md
   - Streaming: streaming.md
-  - Models: models.md
+  - Types: types.md
   - Providers: providers.md
