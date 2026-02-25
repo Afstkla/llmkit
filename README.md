@@ -1,5 +1,8 @@
 # llmkit
 
+[![CI](https://github.com/Afstkla/llmkit/actions/workflows/ci.yml/badge.svg)](https://github.com/Afstkla/llmkit/actions/workflows/ci.yml)
+[![Docs](https://github.com/Afstkla/llmkit/actions/workflows/docs.yml/badge.svg)](https://afstkla.github.io/llmkit/)
+
 Minimal, typed Python LLM wrapper. One `Chat` object, multiple providers, no boilerplate.
 
 Supports **OpenAI**, **Anthropic**, and **Gemini**.
