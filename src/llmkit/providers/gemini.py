@@ -72,11 +72,12 @@ class GeminiProvider:
         if tools:
             config["tools"] = [_tools_to_gemini(tools)]
 
-        async for chunk in self._client.aio.models.generate_content_stream(
+        stream = self._client.aio.models.generate_content_stream(
             model=self._model,
             contents=contents,
             config=genai_types.GenerateContentConfig(**config) if config else None,
-        ):
+        )
+        async for chunk in stream:  # type: ignore[union-attr]
             if chunk.text:
                 yield Reply(
                     text=chunk.text,
