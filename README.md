@@ -7,10 +7,10 @@ Supports **OpenAI**, **Anthropic**, and **Gemini**.
 ## Install
 
 ```bash
-pip install llmkit[all]         # all providers
-pip install llmkit[anthropic]   # just anthropic
-pip install llmkit[openai]      # just openai
-pip install llmkit[gemini]      # just gemini
+uv add llmkit[all]         # all providers
+uv add llmkit[anthropic]   # just anthropic
+uv add llmkit[openai]      # just openai
+uv add llmkit[gemini]      # just gemini
 ```
 
 Requires Python 3.14+.
