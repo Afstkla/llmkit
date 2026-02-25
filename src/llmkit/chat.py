@@ -1,0 +1,130 @@
+from __future__ import annotations
+
+import asyncio
+from collections.abc import AsyncIterator
+from typing import Any, cast
+
+from pydantic import BaseModel
+
+from llmkit.exceptions import ToolError
+from llmkit.tools import ToolRegistry
+from llmkit.types import Message, Reply, ToolCall
+
+
+class Chat:
+    def __init__(
+        self,
+        model: str,
+        *,
+        system: str | None = None,
+        api_key: str | None = None,
+        max_tool_iterations: int = 10,
+        structured_retries: int = 1,
+    ) -> None:
+        from llmkit.providers import get_provider_class, parse_model
+
+        provider_name, model_name = parse_model(model)
+        provider_cls = get_provider_class(provider_name)
+        self._provider = provider_cls(model=model_name, api_key=api_key)
+        self._model_name = model_name
+        self._system = system
+        self._messages: list[Message] = []
+        self._tools = ToolRegistry()
+        self._max_tool_iterations = max_tool_iterations
+        self._structured_retries = structured_retries
+
+    @property
+    def messages(self) -> list[Message]:
+        return list(self._messages)
+
+    @property
+    def tools(self) -> ToolRegistry:
+        return self._tools
+
+    def tool(self, fn: Any) -> Any:
+        """Decorator to register a tool on this chat."""
+        return self._tools.register(fn)
+
+    async def send(
+        self,
+        content: str,
+        *,
+        response_model: type[BaseModel] | None = None,
+    ) -> Reply:
+        self._messages.append(Message(role="user", content=content))
+
+        for _ in range(self._max_tool_iterations):
+            tools_list = self._tools.list()
+            reply: Reply = await self._provider.send(
+                self._messages,
+                system=self._system,
+                tools=tools_list if tools_list else None,
+                response_model=response_model,
+            )
+
+            if not reply.tool_calls:
+                self._messages.append(
+                    Message(role="assistant", content=reply.text)
+                )
+                return reply
+
+            # Handle tool calls
+            self._messages.append(
+                Message(role="assistant", content=None, tool_calls=reply.tool_calls)
+            )
+            for tc in reply.tool_calls:
+                try:
+                    result = await self._tools.acall(tc.name, tc.args)
+                    result_str = str(result)
+                except Exception as e:
+                    result_str = f"Error: {e}"
+
+                tool_result = ToolCall(
+                    id=tc.id, name=tc.name, args=tc.args, result=result_str,
+                )
+                self._messages.append(
+                    Message(
+                        role="tool",
+                        content=result_str,
+                        tool_calls=[tool_result],
+                    )
+                )
+
+        msg = f"Tool loop exceeded {self._max_tool_iterations} iterations"
+        raise ToolError(msg)
+
+    def send_sync(
+        self,
+        content: str,
+        *,
+        response_model: type[BaseModel] | None = None,
+    ) -> Reply:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            import concurrent.futures
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                return cast(
+                    Reply,
+                    pool.submit(
+                        asyncio.run, self.send(content, response_model=response_model)
+                    ).result(),
+                )
+        return asyncio.run(self.send(content, response_model=response_model))
+
+    async def stream(
+        self,
+        content: str,
+    ) -> AsyncIterator[Any]:
+        self._messages.append(Message(role="user", content=content))
+        tools_list = self._tools.list()
+        async for chunk in self._provider.stream(
+            self._messages,
+            system=self._system,
+            tools=tools_list if tools_list else None,
+        ):
+            yield chunk
