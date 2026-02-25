@@ -40,3 +40,25 @@ def parse_model(model: str) -> tuple[str, str]:
         msg = f"Model '{model}' must be in 'provider/model' format (e.g. 'openai/gpt-4o')"
         raise ValueError(msg)
     return model[:slash_idx], model[slash_idx + 1 :]
+
+
+def _register_builtins() -> None:
+    """Lazy-register built-in providers."""
+    try:
+        from llmkit.providers.openai import OpenAIProvider
+        register_provider("openai", OpenAIProvider)
+    except ImportError:
+        pass
+    try:
+        from llmkit.providers.anthropic import AnthropicProvider
+        register_provider("anthropic", AnthropicProvider)
+    except ImportError:
+        pass
+    try:
+        from llmkit.providers.gemini import GeminiProvider
+        register_provider("gemini", GeminiProvider)
+    except ImportError:
+        pass
+
+
+_register_builtins()
