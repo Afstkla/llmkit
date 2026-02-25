@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 from llmkit.providers.anthropic import AnthropicProvider
 
