@@ -44,24 +44,69 @@ def _tool_call_reply(name: str, args: dict[str, Any], call_id: str = "call_1") -
     )
 
 
-def _make_chat(provider: FakeProvider, system: str | None = None) -> Agent:
-    """Create a Agent instance with a fake provider, bypassing __init__."""
-    chat = object.__new__(Agent)
-    chat._provider = provider
-    chat._system = system
-    chat._messages = []
-    chat._tools = ToolRegistry()
-    chat._model_name = "fake/test"
-    chat._hosted_tools = []
-    chat._hooks = defaultdict(list)
-    chat._max_tool_iterations = 10
-    chat._structured_retries = 1
-    return chat
+def _make_agent(
+    provider: FakeProvider,
+    system: str | None = None,
+    messages: list[Message] | None = None,
+) -> Agent:
+    """Create an Agent instance with a fake provider, bypassing __init__."""
+    agent = object.__new__(Agent)
+    agent._provider = provider
+    agent._system = system
+    agent._messages = list(messages) if messages else []
+    agent._tools = ToolRegistry()
+    agent._model_name = "fake/test"
+    agent._hosted_tools = []
+    agent._hooks = defaultdict(list)
+    agent._max_tool_iterations = 10
+    agent._structured_retries = 1
+    return agent
+
+
+async def test_initial_messages():
+    provider = FakeProvider([_simple_reply("Your name is Job.")])
+    agent = _make_agent(provider, messages=[
+        Message(role="user", content="My name is Job"),
+        Message(role="assistant", content="Nice to meet you, Job!"),
+    ])
+
+    assert len(agent.messages) == 2
+    reply = await agent.send("What is my name?")
+    assert reply.text == "Your name is Job."
+    assert len(agent.messages) == 4  # 2 initial + user + assistant
+
+
+async def test_messages_round_trip():
+    """Persist agent.messages, restore into a new Agent — conversation continues."""
+    provider1 = FakeProvider([_simple_reply("Hi Job!")])
+    agent1 = _make_agent(provider1)
+    await agent1.send("My name is Job")
+
+    # Persist
+    saved = agent1.messages
+
+    # Restore into new agent
+    provider2 = FakeProvider([_simple_reply("Your name is Job.")])
+    agent2 = _make_agent(provider2, messages=saved)
+
+    assert len(agent2.messages) == 2
+    reply = await agent2.send("What is my name?")
+    assert reply.text == "Your name is Job."
+    assert len(agent2.messages) == 4
+
+
+async def test_initial_messages_defensive_copy():
+    """Mutating the original list should not affect the agent."""
+    original = [Message(role="user", content="Hello")]
+    provider = FakeProvider([_simple_reply("Hi")])
+    agent = _make_agent(provider, messages=original)
+    original.append(Message(role="user", content="Injected"))
+    assert len(agent.messages) == 1
 
 
 async def test_send_basic():
     provider = FakeProvider([_simple_reply("Hello!")])
-    chat = _make_chat(provider, system="You are helpful.")
+    chat = _make_agent(provider, system="You are helpful.")
 
     reply = await chat.send("Hi")
     assert reply.text == "Hello!"
@@ -70,7 +115,7 @@ async def test_send_basic():
 
 async def test_send_maintains_history():
     provider = FakeProvider([_simple_reply("First"), _simple_reply("Second")])
-    chat = _make_chat(provider)
+    chat = _make_agent(provider)
 
     await chat.send("One")
     await chat.send("Two")
@@ -84,7 +129,7 @@ async def test_tool_decorator():
         _tool_call_reply("double", {"n": 5}),
         _simple_reply("The answer is 10"),
     ])
-    chat = _make_chat(provider)
+    chat = _make_agent(provider)
 
     @chat.tool
     def double(n: int) -> int:
@@ -97,7 +142,7 @@ async def test_tool_decorator():
 
 def test_send_sync():
     provider = FakeProvider([_simple_reply("Sync reply")])
-    chat = _make_chat(provider)
+    chat = _make_agent(provider)
 
     reply = chat.send_sync("Hello")
     assert reply.text == "Sync reply"
@@ -105,7 +150,7 @@ def test_send_sync():
 
 async def test_as_tool():
     provider = FakeProvider([_simple_reply("Tool response")])
-    agent = _make_chat(provider)
+    agent = _make_agent(provider)
 
     tool_fn = agent.as_tool(name="my_agent", description="A helpful agent")
     assert tool_fn.__name__ == "my_agent"
@@ -118,7 +163,7 @@ async def test_as_tool():
 
 async def test_as_tool_empty_response():
     provider = FakeProvider([_simple_reply(None)])
-    agent = _make_chat(provider)
+    agent = _make_agent(provider)
 
     tool_fn = agent.as_tool(name="agent", description="An agent")
     result = await tool_fn(message="Hello")
@@ -139,7 +184,7 @@ async def test_parallel_tool_calls():
         ),
         _simple_reply("1+2=3 and 3*4=12"),
     ])
-    agent = _make_chat(provider)
+    agent = _make_agent(provider)
 
     @agent.tool
     def add(a: int, b: int) -> int:
@@ -163,7 +208,7 @@ async def test_parallel_tool_calls():
 
 async def test_hook_turn_start_end():
     provider = FakeProvider([_simple_reply("Hi")])
-    agent = _make_chat(provider)
+    agent = _make_agent(provider)
     events: list[str] = []
 
     @agent.on("turn_start")
@@ -183,7 +228,7 @@ async def test_hook_tool_call_start_end():
         _tool_call_reply("add", {"a": 1, "b": 2}),
         _simple_reply("3"),
     ])
-    agent = _make_chat(provider)
+    agent = _make_agent(provider)
     events: list[str] = []
 
     @agent.tool
@@ -205,7 +250,7 @@ async def test_hook_tool_call_start_end():
 
 async def test_hook_async():
     provider = FakeProvider([_simple_reply("Hi")])
-    agent = _make_chat(provider)
+    agent = _make_agent(provider)
     events: list[str] = []
 
     @agent.on("turn_end")
@@ -218,7 +263,7 @@ async def test_hook_async():
 
 async def test_hook_multiple_handlers():
     provider = FakeProvider([_simple_reply("Hi")])
-    agent = _make_chat(provider)
+    agent = _make_agent(provider)
     events: list[str] = []
 
     @agent.on("turn_start")

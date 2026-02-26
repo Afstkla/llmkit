@@ -39,6 +39,7 @@ class Agent:
         project_id: str | None = None,
         region: str | None = None,
         hosted_tools: list[HostedTool] | None = None,
+        messages: list[Message] | None = None,
         max_tool_iterations: int = 10,
         structured_retries: int = 1,
     ) -> None:
@@ -62,7 +63,7 @@ class Agent:
         self._provider = provider_cls(**provider_kwargs)
         self._model_name = model_name
         self._system = system
-        self._messages: list[Message] = []
+        self._messages: list[Message] = list(messages) if messages else []
         self._tools = ToolRegistry()
         self._hosted_tools = hosted_tools or []
         self._hooks: dict[Event, list[Hook]] = defaultdict(list)
