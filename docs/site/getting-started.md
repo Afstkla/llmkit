@@ -36,6 +36,23 @@ reply = await agent.send("What is my name?")
 
 Access the full history via `agent.messages`.
 
+## Persisting conversations
+
+Save and restore conversation state:
+
+```python
+from llmkit.types import Message
+
+# Save
+saved: list[Message] = agent.messages
+
+# Restore into a new agent — conversation continues
+new_agent = Agent("openai/gpt-4o", messages=saved)
+reply = await new_agent.send("What did we talk about?")
+```
+
+Both `agent.messages` and the `messages` parameter are defensively copied — mutating either side won't affect the other.
+
 ## Sync convenience
 
 If you don't want async:

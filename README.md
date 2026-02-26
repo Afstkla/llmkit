@@ -44,6 +44,13 @@ reply = await agent.send("What is my name?")
 # reply.text -> "Job"
 ```
 
+Persist and restore conversations:
+
+```python
+saved: list[Message] = agent.messages
+new_agent = Agent("openai/gpt-4o", messages=saved)
+```
+
 ## Structured Output
 
 Pass a Pydantic model, get a validated instance back:
